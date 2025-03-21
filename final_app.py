@@ -60,6 +60,18 @@ def create_booking():
         return jsonify({"message": "Booking created!", "checkout_url": checkout_url})
 
     return jsonify({"error": "Failed to create booking", "details": response.text}), response.status_code
+@application.route("/get_product_info", methods=["GET"])
+def get_product_info():
+    return jsonify({
+        "products": {
+            "River Tubing": {"id": 2240, "price": "35.00", "in_stock": True},
+            "Waterproof Bluetooth Speaker": {"id": 3353, "price": "20.00", "in_stock": True},
+            "Waterproof Phone Case": {"id": 3350, "price": "15.00", "in_stock": True},
+            "Dry Bag": {"id": 3348, "price": "15.00", "in_stock": True},
+            "River Tube Paddle": {"id": 3345, "price": "5.00", "in_stock": True},
+            "Kayak Rental": {"id": 2615, "price": "75.00", "in_stock": True}
+        }
+    })
 
 if __name__ == "__main__":
     application.run()
