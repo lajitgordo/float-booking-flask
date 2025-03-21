@@ -39,17 +39,17 @@ def create_booking():
         if details["quantity"] > 0:
             line_items.append({"product_id": details["id"], "quantity": details["quantity"]})
 
-    # WooCommerce order payload
-    order = {
-        "payment_method": "cod",
-        "set_paid": False,
-        "billing": {
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": email
-        },
-        "line_items": line_items
-    }
+# WooCommerce order payload (for PayPal)
+order = {
+    "payment_method": "paypal",  # Change to PayPal
+    "set_paid": False,  # WooCommerce will mark it as paid after transaction
+    "billing": {
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email
+    },
+    "line_items": line_items
+}
 
     # Send order to WooCommerce
     response = requests.post(WC_API_URL, auth=(WC_KEY, WC_SECRET), json=order)
