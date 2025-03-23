@@ -4,7 +4,7 @@ import os
 
 application = Flask(__name__)
 
-# WooCommerce API credentials from environment variables
+# WooCommerce API credentials (loaded from environment or default)
 WC_API_URL = "https://floatthefox.com/wp-json/wc/v3/orders"
 WC_KEY = os.getenv("WC_API_KEY", "your_consumer_key_here")
 WC_SECRET = os.getenv("WC_API_SECRET", "your_consumer_secret_here")
@@ -17,16 +17,19 @@ def home():
 def create_booking():
     data = request.json
 
-    # Basic details
+    # Booking details from bot
     first_name = data.get("first_name", "Guest")
     last_name = data.get("last_name", "User")
     email = data.get("email", "no-email@example.com")
     product_id = data.get("product_id", 2240)
     quantity = data.get("quantity", 1)
-    booking_date = data.get("booking_date", "Not provided")
-    booking_time = data.get("booking_time", "Not provided")
 
-    # Upsell items (optional)
+    # Assume booking year is 2025
+    booking_date = data.get("booking_date", "June 1")
+    booking_time = data.get("booking_time", "12:00 PM")
+    full_booking_date = f"{booking_date}, 2025"
+
+    # Optional upsells
     extras = {
         "Waterproof Bluetooth Speaker": {"id": 3353, "quantity": data.get("extra_speaker", 0)},
         "Waterproof Phone Case": {"id": 3350, "quantity": data.get("extra_phone_case", 0)},
@@ -35,13 +38,16 @@ def create_booking():
         "Kayak Rental": {"id": 2615, "quantity": data.get("extra_kayak", 0)}
     }
 
-    # Build line_items
+    # Main product and upsell items
     line_items = [{"product_id": product_id, "quantity": quantity}]
-    for item, details in extras.items():
-        if details["quantity"] > 0:
-            line_items.append({"product_id": details["id"], "quantity": details["quantity"]})
+    for item in extras.values():
+        if item["quantity"] > 0:
+            line_items.append({
+                "product_id": item["id"],
+                "quantity": item["quantity"]
+            })
 
-    # Build the WooCommerce order payload
+    # WooCommerce order payload
     order = {
         "payment_method": "paypal",
         "set_paid": False,
@@ -52,24 +58,42 @@ def create_booking():
         },
         "line_items": line_items,
         "meta_data": [
-            {"key": "Booking Date", "value": booking_date},
+            {"key": "Booking Date", "value": full_booking_date},
             {"key": "Booking Time", "value": booking_time}
         ]
     }
 
     try:
+        # Step 1: Create order
         response = requests.post(WC_API_URL, auth=(WC_KEY, WC_SECRET), json=order)
 
         if response.status_code == 201:
             order_data = response.json()
             order_id = order_data.get("id")
-            checkout_url = f"https://floatthefox.com/checkout/order-pay/{order_id}?pay_for_order=true"
-            return jsonify({"message": "Booking created!", "checkout_url": checkout_url})
 
-        return jsonify({"error": "Failed to create booking", "details": response.text}), response.status_code
+            # Step 2: Send customer invoice email
+            invoice_url = f"https://floatthefox.com/wp-json/wc/v3/orders/{order_id}/send_email"
+            invoice_payload = {"email": "customer_invoice"}
+            requests.post(invoice_url, auth=(WC_KEY, WC_SECRET), json=invoice_payload)
+
+            # Step 3: Return checkout URL
+            checkout_url = f"https://floatthefox.com/checkout/order-pay/{order_id}?pay_for_order=true"
+            return jsonify({
+                "message": "Booking created!",
+                "checkout_url": checkout_url,
+                "order_id": order_id
+            })
+
+        return jsonify({
+            "error": "Failed to create booking",
+            "details": response.text
+        }), response.status_code
 
     except Exception as e:
-        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+        return jsonify({
+            "error": "Internal server error",
+            "details": str(e)
+        }), 500
 
 @application.route("/get_product_info", methods=["GET"])
 def get_product_info():
